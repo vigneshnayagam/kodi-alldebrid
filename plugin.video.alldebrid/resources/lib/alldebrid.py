@@ -27,23 +27,23 @@ class AllDebridAPI:
         params['agent'] = AGENT
 
         url = self._url(path, version)
-        if method == 'GET' or (method == 'POST' and not data):
+
+        if method == 'POST':
             query = urllib.parse.urlencode(params, doseq=True)
             url = f'{url}?{query}'
-
-        log(f'{method} {url}')
-
-        if method == 'POST' and data:
-            query = urllib.parse.urlencode(params, doseq=True)
-            url = f'{url}?{query}'
-            encoded_data = urllib.parse.urlencode(data, doseq=True).encode('utf-8')
-            req = urllib.request.Request(url, data=encoded_data, method='POST')
+            post_body = urllib.parse.urlencode(data or {}, doseq=True).encode('utf-8')
+            req = urllib.request.Request(url, data=post_body, method='POST')
             req.add_header('Content-Type', 'application/x-www-form-urlencoded')
         else:
-            req = urllib.request.Request(url, method=method)
+            all_params = {**params, **(data or {})}
+            query = urllib.parse.urlencode(all_params, doseq=True)
+            url = f'{url}?{query}'
+            req = urllib.request.Request(url, method='GET')
 
         if auth and self.api_key:
             req.add_header('Authorization', f'Bearer {self.api_key}')
+
+        log(f'{method} {url}')
 
         retry_delays = [1, 3, 5]
         for attempt in range(3):
@@ -84,16 +84,16 @@ class AllDebridAPI:
     def _get(self, path, params=None, version='v4', auth=True):
         return self._request('GET', path, params=params, version=version, auth=auth)
 
-    def _post(self, path, params=None, data=None, version='v4', auth=True):
+    def _post(self, path, data=None, params=None, version='v4', auth=True):
         return self._request('POST', path, params=params, data=data, version=version, auth=auth)
 
-    # --- PIN Auth (no auth required) ---
+    # --- PIN Auth (v4.1, no auth required) ---
 
     def pin_get(self):
-        return self._get('pin/get', auth=False)
+        return self._get('pin/get', version='v4.1', auth=False)
 
     def pin_check(self, check, pin):
-        return self._get('pin/check', params={'check': check, 'pin': pin}, auth=False)
+        return self._post('pin/check', data={'check': check, 'pin': pin}, auth=False)
 
     # --- User ---
 
@@ -104,43 +104,47 @@ class AllDebridAPI:
         data = self._get('user/links')
         return data.get('links', [])
 
-    # --- Magnets ---
+    def get_user_history(self):
+        data = self._get('user/history')
+        return data.get('links', [])
+
+    # --- Magnets (v4.1) ---
 
     def get_magnets(self, status_filter=None):
-        params = {}
+        data = {}
         if status_filter:
-            params['status'] = status_filter
-        data = self._get('magnet/status', params=params)
-        return data.get('magnets', [])
+            data['status'] = status_filter
+        result = self._post('magnet/status', data=data, version='v4.1')
+        return result.get('magnets', [])
 
     def get_magnet(self, magnet_id):
-        data = self._get('magnet/status', params={'id': magnet_id})
-        return data.get('magnets', {})
+        result = self._post('magnet/status', data={'id': magnet_id}, version='v4.1')
+        magnets = result.get('magnets', [])
+        return magnets[0] if magnets else {}
 
     def get_magnet_files(self, magnet_id):
-        data = self._get('magnet/files', params={'id[]': magnet_id})
-        files_data = data.get('files', [])
-        if files_data and isinstance(files_data, list):
-            first = files_data[0]
-            return first.get('files', first.get('e', []))
-        return files_data
+        result = self._post('magnet/files', data={'id[]': magnet_id})
+        magnets = result.get('magnets', [])
+        if magnets:
+            return magnets[0].get('files', [])
+        return []
 
     def upload_magnet(self, magnet_uri):
         return self._post('magnet/upload', data={'magnets[]': magnet_uri})
 
     def delete_magnet(self, magnet_id):
-        return self._get('magnet/delete', params={'id': magnet_id})
+        return self._post('magnet/delete', data={'id': magnet_id})
 
     def restart_magnet(self, magnet_id):
-        return self._get('magnet/restart', params={'id': magnet_id})
+        return self._post('magnet/restart', data={'id': magnet_id})
 
     # --- Links ---
 
     def unlock_link(self, link):
-        return self._get('link/unlock', params={'link': link})
+        return self._post('link/unlock', data={'link': link})
 
     def get_streaming_link(self, gen_id, stream_id):
-        return self._get('link/streaming', params={'id': gen_id, 'stream': stream_id})
+        return self._post('link/streaming', data={'id': gen_id, 'stream': stream_id})
 
     def check_delayed(self, delayed_id):
-        return self._get('link/delayed', params={'id': delayed_id})
+        return self._post('link/delayed', data={'id': delayed_id})
