@@ -11,8 +11,9 @@ from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
-    read_debug_trace, clear_debug_trace, get_bool_setting,
+    read_debug_trace, clear_debug_trace, get_bool_setting, debug_trace,
 )
+import json
 
 ADDON = xbmcaddon.Addon()
 PLUGIN_URL = sys.argv[0]
@@ -146,6 +147,9 @@ def list_magnet_files(magnet_id):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
+    debug_trace(f'=== BROWSE magnet {magnet_id} ===')
+    debug_trace(f'raw files tree: {json.dumps(files)[:2000]}')
+
     if not files:
         notify('No files found in this magnet.')
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -178,15 +182,18 @@ def list_folder(magnet_id, path):
     decoded_path = unquote_plus(path)
     segments = decoded_path.split('/')
     current = files
+    debug_trace(f'=== FOLDER nav magnet {magnet_id} path="{decoded_path}" segments={segments}')
 
     for segment in segments:
         found = False
         for entry in current:
-            if entry.get('n') == segment and 'e' in entry:
+            if entry.get('n') == segment and entry.get('e') is not None:
                 current = entry['e']
                 found = True
                 break
         if not found:
+            names = [e.get('n') for e in current]
+            debug_trace(f'segment "{segment}" NOT found. available: {names}')
             notify('Folder not found', icon='error')
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             return
@@ -315,17 +322,20 @@ def _folder_item(label, icon):
 
 def _build_file_listing(entries, magnet_id, path_prefix=''):
     items = []
+    skipped = 0
     for entry in entries:
         name = entry.get('n', 'Unknown')
+        children = entry.get('e')
+        link = entry.get('l')
 
-        if 'e' in entry:
+        if children is not None:
             li = xbmcgui.ListItem(label=name)
             li.setArt({'icon': 'DefaultFolder.png'})
             sub_path = f'{path_prefix}/{name}' if path_prefix else name
             url = build_url(action='folder', id=magnet_id, path=quote_plus(sub_path))
             items.append((url, li, True))
 
-        elif 'l' in entry:
+        elif link:
             size_text = format_size(entry.get('s', 0))
             label = name
             if size_text:
@@ -341,8 +351,13 @@ def _build_file_listing(entries, magnet_id, path_prefix=''):
             else:
                 li.setArt({'icon': 'DefaultFile.png'})
 
-            url = build_url(action='play', link=quote_plus(entry['l']))
+            url = build_url(action='play', link=quote_plus(link))
             items.append((url, li, False))
+        else:
+            skipped += 1
+            debug_trace(f'SKIPPED entry (no e/l): {json.dumps(entry)[:300]}')
+
+    debug_trace(f'_build_file_listing: {len(items)} items, {skipped} skipped, prefix="{path_prefix}"')
 
     xbmcplugin.addDirectoryItems(HANDLE, items, len(items))
     xbmcplugin.setContent(HANDLE, 'videos')
