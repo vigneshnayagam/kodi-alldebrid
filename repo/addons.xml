@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addons><addon id="plugin.video.alldebrid" version="1.0.0" name="AllDebrid Cloud" provider-name="vignesh.nayagam">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0" />
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="addon.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">Browse and stream your AllDebrid cloud content</summary>
+        <description lang="en_GB">Access your AllDebrid magnet downloads and saved links directly in Kodi. Supports PIN authentication for easy setup on Android TV, folder browsing, and multi-quality streaming.</description>
+        <platform>all</platform>
+        <license>GPL-3.0-only</license>
+        <assets>
+            <icon>resources/icon.png</icon>
+            <fanart>resources/fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon><addon id="repository.alldebrid" name="AllDebrid Cloud Repository" version="1.0.0" provider-name="vignesh.nayagam">
+    <extension point="xbmc.addon.repository" name="AllDebrid Cloud Repository">
+        <info compressed="false">https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main/addons.xml</info>
+        <checksum>https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main/addons.xml.md5</checksum>
+        <datadir zip="true">https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main</datadir>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">AllDebrid Cloud Repository</summary>
+        <description lang="en_GB">Repository for the AllDebrid Cloud Kodi add-on.</description>
+        <platform>all</platform>
+        <license>GPL-3.0-only</license>
+    </extension>
+</addon></addons>

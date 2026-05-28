@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings version="2">
+    <section id="main">
+        <category id="account" label="Account">
+            <group id="auth">
+                <setting id="api_key" type="string" label="API Key">
+                    <default></default>
+                    <control type="edit" format="string" hidden="true"/>
+                </setting>
+                <setting id="username" type="string" label="Logged in as" enable="false">
+                    <default></default>
+                    <control type="edit" format="string"/>
+                </setting>
+                <setting id="premium_until" type="string" label="Premium until" enable="false">
+                    <default></default>
+                    <control type="edit" format="string"/>
+                </setting>
+            </group>
+        </category>
+        <category id="playback" label="Playback">
+            <group id="quality">
+                <setting id="preferred_quality" type="integer" label="Preferred Video Quality">
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="Original (Direct Link)">0</option>
+                            <option label="1080p">1080</option>
+                            <option label="720p">720</option>
+                            <option label="480p">480</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner"/>
+                </setting>
+                <setting id="auto_play_single" type="boolean" label="Auto-play single file magnets">
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+        </category>
+        <category id="advanced" label="Advanced">
+            <group id="debug">
+                <setting id="debug_logging" type="boolean" label="Enable debug logging">
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+        </category>
+    </section>
+</settings>
