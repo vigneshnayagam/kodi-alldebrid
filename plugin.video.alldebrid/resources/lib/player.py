@@ -4,9 +4,8 @@ import traceback
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
 from .alldebrid import AllDebridAPI, AllDebridError
-from .utils import log, notify, debug_trace
+from .utils import log, notify, debug_trace, get_int_setting
 
 HANDLE = int(sys.argv[1])
 
@@ -36,7 +35,7 @@ def _resolve_and_play_inner(api, link):
 
     direct_url = result.get('link', '')
     filename = result.get('filename', '')
-    streams = result.get('streams', [])
+    streams = result.get('streams') or result.get('streaming') or []
     gen_id = result.get('id', '')
 
     debug_trace(f'direct_url: {direct_url}')
@@ -49,8 +48,7 @@ def _resolve_and_play_inner(api, link):
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
-    addon = xbmcaddon.Addon()
-    preferred_quality = addon.getSettingInt('preferred_quality')
+    preferred_quality = get_int_setting('preferred_quality', 0)
     play_url = direct_url
 
     if preferred_quality > 0 and streams and gen_id:

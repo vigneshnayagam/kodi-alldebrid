@@ -11,7 +11,7 @@ from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
-    read_debug_trace, clear_debug_trace,
+    read_debug_trace, clear_debug_trace, get_bool_setting,
 )
 
 ADDON = xbmcaddon.Addon()
@@ -152,7 +152,7 @@ def list_magnet_files(magnet_id):
         return
 
     video_files = _collect_video_files(files)
-    auto_play = ADDON.getSettingBool('auto_play_single')
+    auto_play = get_bool_setting('auto_play_single', True)
 
     if auto_play and len(video_files) == 1:
         link = video_files[0].get('l', '')

@@ -72,8 +72,7 @@ def is_video_file(filename):
 
 
 def log(message, level='debug'):
-    addon = xbmcaddon.Addon()
-    debug_enabled = addon.getSettingBool('debug_logging')
+    debug_enabled = get_bool_setting('debug_logging', False)
     prefix = '[AllDebrid Cloud]'
     if level == 'error':
         xbmc.log(f'{prefix} {message}', xbmc.LOGERROR)
@@ -81,6 +80,26 @@ def log(message, level='debug'):
         xbmc.log(f'{prefix} {message}', xbmc.LOGINFO)
     elif debug_enabled:
         xbmc.log(f'{prefix} {message}', xbmc.LOGDEBUG)
+
+
+def get_int_setting(key, default=0):
+    addon = xbmcaddon.Addon()
+    try:
+        val = addon.getSetting(key)
+        return int(val) if val not in (None, '') else default
+    except (ValueError, TypeError):
+        return default
+
+
+def get_bool_setting(key, default=False):
+    addon = xbmcaddon.Addon()
+    try:
+        val = addon.getSetting(key)
+        if val in (None, ''):
+            return default
+        return str(val).strip().lower() in ('true', '1', 'yes')
+    except (ValueError, TypeError):
+        return default
 
 
 def notify(message, icon='info', time_ms=5000):
