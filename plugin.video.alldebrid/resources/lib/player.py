@@ -4,34 +4,25 @@ import traceback
 import xbmc
 import xbmcgui
 import xbmcplugin
-from .alldebrid import AllDebridAPI, AllDebridError
-from .utils import log, notify, debug_trace, get_int_setting
+from .alldebrid import AllDebridError
+from .utils import notify, debug_trace, get_int_setting
 
 HANDLE = int(sys.argv[1])
 
 
-def resolve_and_play(api, link):
-    debug_trace('=== PLAY ATTEMPT ===')
-    debug_trace(f'input link: {link}')
-
-    try:
-        _resolve_and_play_inner(api, link)
-    except Exception as e:
-        debug_trace(f'UNEXPECTED EXCEPTION: {e}')
-        debug_trace(traceback.format_exc())
-        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}')
-        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
-
-
-def _resolve_and_play_inner(api, link):
+def _resolve_url(api, link):
+    """
+    Resolve an AllDebrid link to a final playable URL.
+    Returns (play_url, filename) or (None, None) on failure.
+    Shows an error dialog on failure.
+    """
     try:
         result = api.unlock_link(link)
-        debug_trace(f'unlock_link OK. full response: {json.dumps(result)[:1500]}')
+        debug_trace(f'unlock_link OK. response: {json.dumps(result)[:1200]}')
     except AllDebridError as e:
         debug_trace(f'unlock_link FAILED: [{e.code}] {e.message}')
         xbmcgui.Dialog().ok('AllDebrid Error', f'[{e.code}]\n{e.message}')
-        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
-        return
+        return None, None
 
     direct_url = result.get('link', '')
     filename = result.get('filename', '')
@@ -39,17 +30,15 @@ def _resolve_and_play_inner(api, link):
     gen_id = result.get('id', '')
 
     debug_trace(f'direct_url: {direct_url}')
-    debug_trace(f'filename: {filename}')
-    debug_trace(f'streams count: {len(streams)}, gen_id: {gen_id}')
+    debug_trace(f'filename: {filename} | streams: {len(streams)} | gen_id: {gen_id}')
 
     if not direct_url:
         debug_trace('NO direct_url in response!')
         xbmcgui.Dialog().ok('AllDebrid Error', f'No playable URL.\nKeys: {list(result.keys())}')
-        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
-        return
+        return None, None
 
-    preferred_quality = get_int_setting('preferred_quality', 0)
     play_url = direct_url
+    preferred_quality = get_int_setting('preferred_quality', 0)
 
     if preferred_quality > 0 and streams and gen_id:
         stream_id = select_stream(streams, preferred_quality)
@@ -68,15 +57,57 @@ def _resolve_and_play_inner(api, link):
                 debug_trace(f'streaming failed, using direct: [{e.code}] {e.message}')
 
     debug_trace(f'FINAL play_url: {play_url}')
-    debug_trace(f'play_url scheme: {play_url.split("://")[0] if "://" in play_url else "NONE"}')
+    return play_url, filename
 
-    li = xbmcgui.ListItem(label=filename, path=play_url, offscreen=True)
+
+def _make_listitem(play_url, filename):
+    li = xbmcgui.ListItem(label=filename, path=play_url)
     li.setProperty('IsPlayable', 'true')
-    li.setMimeType('video/mp4')
     li.setContentLookup(False)
-    debug_trace('calling setResolvedUrl(True)')
-    xbmcplugin.setResolvedUrl(HANDLE, True, li)
-    debug_trace('setResolvedUrl returned')
+    info = li.getVideoInfoTag()
+    info.setTitle(filename)
+    return li
+
+
+def resolve_and_play(api, link):
+    """Used when Kodi is in resolve mode (clicking a playable file item)."""
+    debug_trace('=== PLAY (resolve mode) ===')
+    debug_trace(f'input link: {link}')
+    try:
+        play_url, filename = _resolve_url(api, link)
+        if not play_url:
+            xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+            return
+        li = _make_listitem(play_url, filename)
+        debug_trace('calling setResolvedUrl(True)')
+        xbmcplugin.setResolvedUrl(HANDLE, True, li)
+    except Exception as e:
+        debug_trace(f'UNEXPECTED EXCEPTION: {e}')
+        debug_trace(traceback.format_exc())
+        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}')
+        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+
+
+def play_direct(api, link):
+    """
+    Used when NOT in resolve mode (e.g. auto-play after entering a magnet folder).
+    Starts playback directly via the Player, which works in any context.
+    """
+    debug_trace('=== PLAY (direct/Player mode) ===')
+    debug_trace(f'input link: {link}')
+    try:
+        # End the directory first so Kodi isn't left waiting on a folder listing.
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False, updateListing=False, cacheToDisc=False)
+        play_url, filename = _resolve_url(api, link)
+        if not play_url:
+            return
+        li = _make_listitem(play_url, filename)
+        debug_trace('calling xbmc.Player().play()')
+        xbmc.Player().play(play_url, li)
+    except Exception as e:
+        debug_trace(f'UNEXPECTED EXCEPTION: {e}')
+        debug_trace(traceback.format_exc())
+        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}')
 
 
 def select_stream(streams, preferred_quality):
@@ -128,7 +159,7 @@ def wait_for_delayed(api, delayed_id):
             progress.update(pct, f'Transcoding... {time_left}s remaining')
 
         except AllDebridError as e:
-            log(f'Delayed check error: {e}', level='error')
+            debug_trace(f'Delayed check error: {e}')
 
         xbmc.sleep(2000)
 

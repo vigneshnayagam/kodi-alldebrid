@@ -8,7 +8,7 @@ import xbmcaddon
 
 from resources.lib.alldebrid import AllDebridAPI, AllDebridError
 from resources.lib.auth import ensure_auth, clear_auth
-from resources.lib.player import resolve_and_play
+from resources.lib.player import resolve_and_play, play_direct
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
     read_debug_trace, clear_debug_trace, get_bool_setting, debug_trace,
@@ -161,7 +161,8 @@ def list_magnet_files(magnet_id):
     if auto_play and len(video_files) == 1:
         link = video_files[0].get('l', '')
         if link:
-            resolve_and_play(api, link)
+            debug_trace('auto-play single video -> play_direct')
+            play_direct(api, link)
             return
 
     _build_file_listing(files, magnet_id)
