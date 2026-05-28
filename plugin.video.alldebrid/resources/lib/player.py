@@ -1,29 +1,36 @@
 import sys
+import json
+import traceback
 import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
 from .alldebrid import AllDebridAPI, AllDebridError
-from .utils import log, notify
+from .utils import log, notify, debug_trace
 
 HANDLE = int(sys.argv[1])
 
 
 def resolve_and_play(api, link):
-    log(f'resolve_and_play: {link}', level='info')
+    debug_trace('=== PLAY ATTEMPT ===')
+    debug_trace(f'input link: {link}')
 
-    # Try to unlock the link through AllDebrid
+    try:
+        _resolve_and_play_inner(api, link)
+    except Exception as e:
+        debug_trace(f'UNEXPECTED EXCEPTION: {e}')
+        debug_trace(traceback.format_exc())
+        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}')
+        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+
+
+def _resolve_and_play_inner(api, link):
     try:
         result = api.unlock_link(link)
-        log(f'unlock_link result keys: {list(result.keys())}', level='info')
+        debug_trace(f'unlock_link OK. full response: {json.dumps(result)[:1500]}')
     except AllDebridError as e:
-        log(f'unlock_link failed ({e.code}: {e.message})', level='error')
-        xbmcgui.Dialog().ok('AllDebrid Error', f'[{e.code}]\n{e.message}\n\nLink: {link[:80]}')
-        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
-        return
-    except Exception as e:
-        log(f'unlock_link unexpected error: {e}', level='error')
-        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}\n\nLink: {link[:80]}')
+        debug_trace(f'unlock_link FAILED: [{e.code}] {e.message}')
+        xbmcgui.Dialog().ok('AllDebrid Error', f'[{e.code}]\n{e.message}')
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
@@ -32,10 +39,13 @@ def resolve_and_play(api, link):
     streams = result.get('streams', [])
     gen_id = result.get('id', '')
 
-    log(f'direct_url={direct_url} filename={filename} streams={len(streams)} id={gen_id}', level='info')
+    debug_trace(f'direct_url: {direct_url}')
+    debug_trace(f'filename: {filename}')
+    debug_trace(f'streams count: {len(streams)}, gen_id: {gen_id}')
 
     if not direct_url:
-        xbmcgui.Dialog().ok('AllDebrid Error', f'No playable URL returned.\n\nResponse keys: {list(result.keys())}')
+        debug_trace('NO direct_url in response!')
+        xbmcgui.Dialog().ok('AllDebrid Error', f'No playable URL.\nKeys: {list(result.keys())}')
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
@@ -45,9 +55,11 @@ def resolve_and_play(api, link):
 
     if preferred_quality > 0 and streams and gen_id:
         stream_id = select_stream(streams, preferred_quality)
+        debug_trace(f'selected stream_id: {stream_id} for quality {preferred_quality}')
         if stream_id:
             try:
                 stream_result = api.get_streaming_link(gen_id, stream_id)
+                debug_trace(f'streaming response: {json.dumps(stream_result)[:800]}')
                 if stream_result.get('delayed'):
                     delayed_url = wait_for_delayed(api, stream_result['delayed'])
                     if delayed_url:
@@ -55,13 +67,18 @@ def resolve_and_play(api, link):
                 else:
                     play_url = stream_result.get('link', direct_url)
             except AllDebridError as e:
-                log(f'Streaming link failed, falling back to direct: {e}', level='error')
+                debug_trace(f'streaming failed, using direct: [{e.code}] {e.message}')
 
-    log(f'Playing: {filename} -> {play_url}', level='info')
+    debug_trace(f'FINAL play_url: {play_url}')
+    debug_trace(f'play_url scheme: {play_url.split("://")[0] if "://" in play_url else "NONE"}')
 
     li = xbmcgui.ListItem(label=filename, path=play_url, offscreen=True)
     li.setProperty('IsPlayable', 'true')
+    li.setMimeType('video/mp4')
+    li.setContentLookup(False)
+    debug_trace('calling setResolvedUrl(True)')
     xbmcplugin.setResolvedUrl(HANDLE, True, li)
+    debug_trace('setResolvedUrl returned')
 
 
 def select_stream(streams, preferred_quality):

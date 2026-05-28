@@ -9,7 +9,10 @@ import xbmcaddon
 from resources.lib.alldebrid import AllDebridAPI, AllDebridError
 from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play
-from resources.lib.utils import format_size, format_status, format_date, is_video_file, log, notify
+from resources.lib.utils import (
+    format_size, format_status, format_date, is_video_file, log, notify,
+    read_debug_trace, clear_debug_trace,
+)
 
 ADDON = xbmcaddon.Addon()
 PLUGIN_URL = sys.argv[0]
@@ -62,6 +65,8 @@ def main_menu():
          _folder_item('Add Magnet', 'DefaultAddSource.png'), False),
         (build_url(action='reauth'),
          _folder_item('Re-authenticate', 'DefaultUser.png'), False),
+        (build_url(action='debug_log'),
+         _folder_item('Debug Log', 'DefaultAddonService.png'), False),
         (build_url(action='settings'),
          _folder_item('Settings', 'DefaultAddonProgram.png'), False),
     ]
@@ -273,6 +278,13 @@ def restart_magnet(magnet_id):
         handle_api_error(e)
 
 
+def show_debug_log():
+    content = read_debug_trace()
+    choice = xbmcgui.Dialog().textviewer('AllDebrid Debug Log', content)
+    if xbmcgui.Dialog().yesno('Debug Log', 'Clear the debug log?'):
+        clear_debug_trace()
+
+
 def add_magnet_dialog():
     magnet_uri = xbmcgui.Dialog().input('Enter Magnet Link or Hash')
     if not magnet_uri:
@@ -375,6 +387,8 @@ def router():
     elif action == 'reauth':
         clear_auth()
         ensure_auth()
+    elif action == 'debug_log':
+        show_debug_log()
     elif action == 'settings':
         ADDON.openSettings()
 

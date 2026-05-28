@@ -1,8 +1,48 @@
+import os
 import time
 import xbmc
 import xbmcgui
 import xbmcaddon
+import xbmcvfs
 from .constants import MAGNET_STATUS, VIDEO_EXTENSIONS
+
+
+def _debug_log_path():
+    addon = xbmcaddon.Addon()
+    profile = xbmcvfs.translatePath(addon.getAddonInfo('profile'))
+    if not os.path.isdir(profile):
+        os.makedirs(profile, exist_ok=True)
+    return os.path.join(profile, 'debug.log')
+
+
+def debug_trace(message):
+    """Append a timestamped line to the in-profile debug log (always on)."""
+    try:
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        with open(_debug_log_path(), 'a', encoding='utf-8') as f:
+            f.write(f'[{ts}] {message}\n')
+    except Exception:
+        pass
+
+
+def read_debug_trace():
+    path = _debug_log_path()
+    if os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read() or 'Debug log is empty.'
+        except Exception as e:
+            return f'Could not read debug log: {e}'
+    return 'No debug log yet. Try playing a file first.'
+
+
+def clear_debug_trace():
+    path = _debug_log_path()
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except Exception:
+        pass
 
 
 def format_size(size_bytes):
