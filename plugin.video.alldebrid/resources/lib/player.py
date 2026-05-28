@@ -10,11 +10,16 @@ HANDLE = int(sys.argv[1])
 
 
 def resolve_and_play(api, link):
+    log(f'resolve_and_play: {link}', level='info')
+
+    # Try to unlock the link through AllDebrid
     try:
         result = api.unlock_link(link)
+        log(f'unlock_link result keys: {list(result.keys())}', level='info')
     except AllDebridError as e:
-        notify(f'Failed to unlock link: {e.message}', icon='error')
-        log(f'Link unlock failed: {e}', level='error')
+        # If unlock fails, try playing the link directly (already a CDN URL)
+        log(f'unlock_link failed ({e.code}: {e.message}), trying direct play', level='error')
+        notify(f'AllDebrid: {e.message}', icon='error', time_ms=8000)
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
@@ -23,9 +28,15 @@ def resolve_and_play(api, link):
     streams = result.get('streams', [])
     gen_id = result.get('id', '')
 
+    log(f'direct_url={direct_url} filename={filename} streams={len(streams)} id={gen_id}', level='info')
+
+    if not direct_url:
+        notify('AllDebrid returned no playable URL', icon='error', time_ms=8000)
+        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+        return
+
     addon = xbmcaddon.Addon()
     preferred_quality = addon.getSettingInt('preferred_quality')
-
     play_url = direct_url
 
     if preferred_quality > 0 and streams and gen_id:
@@ -33,7 +44,6 @@ def resolve_and_play(api, link):
         if stream_id:
             try:
                 stream_result = api.get_streaming_link(gen_id, stream_id)
-
                 if stream_result.get('delayed'):
                     delayed_url = wait_for_delayed(api, stream_result['delayed'])
                     if delayed_url:
@@ -43,12 +53,7 @@ def resolve_and_play(api, link):
             except AllDebridError as e:
                 log(f'Streaming link failed, falling back to direct: {e}', level='error')
 
-    if not play_url:
-        notify('No playable URL found', icon='error')
-        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
-        return
-
-    log(f'Playing: {filename} -> {play_url}')
+    log(f'Playing: {filename} -> {play_url}', level='info')
 
     li = xbmcgui.ListItem(label=filename, path=play_url, offscreen=True)
     li.setProperty('IsPlayable', 'true')
