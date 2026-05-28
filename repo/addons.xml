@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addons><addon id="plugin.video.alldebrid" version="1.0.2" name="AllDebrid Cloud" provider-name="vignesh.nayagam">
+<addons><addon id="plugin.video.alldebrid" version="1.0.3" name="AllDebrid Cloud" provider-name="vignesh.nayagam">
     <requires>
         <import addon="xbmc.python" version="3.0.0" />
     </requires>

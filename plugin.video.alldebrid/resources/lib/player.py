@@ -17,9 +17,13 @@ def resolve_and_play(api, link):
         result = api.unlock_link(link)
         log(f'unlock_link result keys: {list(result.keys())}', level='info')
     except AllDebridError as e:
-        # If unlock fails, try playing the link directly (already a CDN URL)
-        log(f'unlock_link failed ({e.code}: {e.message}), trying direct play', level='error')
-        notify(f'AllDebrid: {e.message}', icon='error', time_ms=8000)
+        log(f'unlock_link failed ({e.code}: {e.message})', level='error')
+        xbmcgui.Dialog().ok('AllDebrid Error', f'[{e.code}]\n{e.message}\n\nLink: {link[:80]}')
+        xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+        return
+    except Exception as e:
+        log(f'unlock_link unexpected error: {e}', level='error')
+        xbmcgui.Dialog().ok('AllDebrid Error', f'Unexpected error:\n{e}\n\nLink: {link[:80]}')
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
@@ -31,7 +35,7 @@ def resolve_and_play(api, link):
     log(f'direct_url={direct_url} filename={filename} streams={len(streams)} id={gen_id}', level='info')
 
     if not direct_url:
-        notify('AllDebrid returned no playable URL', icon='error', time_ms=8000)
+        xbmcgui.Dialog().ok('AllDebrid Error', f'No playable URL returned.\n\nResponse keys: {list(result.keys())}')
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
         return
 
