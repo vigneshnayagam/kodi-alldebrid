@@ -18,9 +18,9 @@
     </extension>
 </addon><addon id="repository.alldebrid" name="AllDebrid Cloud Repository" version="1.0.0" provider-name="vignesh.nayagam">
     <extension point="xbmc.addon.repository" name="AllDebrid Cloud Repository">
-        <info compressed="false">https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main/addons.xml</info>
-        <checksum>https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main/addons.xml.md5</checksum>
-        <datadir zip="true">https://raw.githubusercontent.com/GITHUB_USERNAME/GITHUB_REPO/main</datadir>
+        <info compressed="false">https://raw.githubusercontent.com/vigneshnayagam/kodi-alldebrid/main/addons.xml</info>
+        <checksum>https://raw.githubusercontent.com/vigneshnayagam/kodi-alldebrid/main/addons.xml.md5</checksum>
+        <datadir zip="true">https://raw.githubusercontent.com/vigneshnayagam/kodi-alldebrid/main</datadir>
     </extension>
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">AllDebrid Cloud Repository</summary>
