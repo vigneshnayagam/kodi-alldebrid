@@ -5,9 +5,46 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 from .alldebrid import AllDebridError
-from .utils import notify, debug_trace, get_int_setting
+from .utils import notify, debug_trace, get_int_setting, get_bool_setting
+from .resume import get_resume_position, save_resume_position, clear_resume_position
 
 HANDLE = int(sys.argv[1])
+
+_active_player = None
+
+
+class AllDebridPlayer(xbmc.Player):
+
+    def __init__(self, link, filename):
+        super().__init__()
+        self._link = link
+        self._filename = filename
+        self._tracking = True
+
+    def onPlayBackStopped(self):
+        self._save_position()
+        self._tracking = False
+
+    def onPlayBackPaused(self):
+        self._save_position()
+
+    def onPlayBackEnded(self):
+        clear_resume_position(self._link)
+        self._tracking = False
+
+    def _save_position(self):
+        if not self._tracking:
+            return
+        try:
+            pos = self.getTime()
+            total = self.getTotalTime()
+            if total > 0 and pos > 0:
+                if pos / total > 0.90:
+                    clear_resume_position(self._link)
+                else:
+                    save_resume_position(self._link, pos, total, self._filename)
+        except RuntimeError:
+            pass
 
 
 def _resolve_url(api, link):
@@ -60,17 +97,21 @@ def _resolve_url(api, link):
     return play_url, filename
 
 
-def _make_listitem(play_url, filename):
+def _make_listitem(play_url, filename, resume_position=0, resume_total=0):
     li = xbmcgui.ListItem(label=filename, path=play_url)
     li.setProperty('IsPlayable', 'true')
     li.setContentLookup(False)
     info = li.getVideoInfoTag()
     info.setTitle(filename)
+    if resume_position > 0 and resume_total > 0:
+        li.setProperty('ResumeTime', str(resume_position))
+        li.setProperty('TotalTime', str(resume_total))
     return li
 
 
 def resolve_and_play(api, link):
     """Used when Kodi is in resolve mode (clicking a playable file item)."""
+    global _active_player
     debug_trace('=== PLAY (resolve mode) ===')
     debug_trace(f'input link: {link}')
     try:
@@ -78,9 +119,16 @@ def resolve_and_play(api, link):
         if not play_url:
             xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
             return
-        li = _make_listitem(play_url, filename)
+
+        position, total = 0.0, 0.0
+        if get_bool_setting('enable_resume', True):
+            position, total = get_resume_position(link)
+            debug_trace(f'resume: pos={position:.1f} total={total:.1f}')
+
+        li = _make_listitem(play_url, filename, position, total)
         debug_trace('calling setResolvedUrl(True)')
         xbmcplugin.setResolvedUrl(HANDLE, True, li)
+        _active_player = AllDebridPlayer(link, filename)
     except Exception as e:
         debug_trace(f'UNEXPECTED EXCEPTION: {e}')
         debug_trace(traceback.format_exc())
@@ -93,17 +141,24 @@ def play_direct(api, link):
     Used when NOT in resolve mode (e.g. auto-play after entering a magnet folder).
     Starts playback directly via the Player, which works in any context.
     """
+    global _active_player
     debug_trace('=== PLAY (direct/Player mode) ===')
     debug_trace(f'input link: {link}')
     try:
-        # End the directory first so Kodi isn't left waiting on a folder listing.
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False, updateListing=False, cacheToDisc=False)
         play_url, filename = _resolve_url(api, link)
         if not play_url:
             return
-        li = _make_listitem(play_url, filename)
-        debug_trace('calling xbmc.Player().play()')
-        xbmc.Player().play(play_url, li)
+
+        position, total = 0.0, 0.0
+        if get_bool_setting('enable_resume', True):
+            position, total = get_resume_position(link)
+            debug_trace(f'resume: pos={position:.1f} total={total:.1f}')
+
+        li = _make_listitem(play_url, filename, position, total)
+        debug_trace('calling AllDebridPlayer.play()')
+        _active_player = AllDebridPlayer(link, filename)
+        _active_player.play(play_url, li)
     except Exception as e:
         debug_trace(f'UNEXPECTED EXCEPTION: {e}')
         debug_trace(traceback.format_exc())

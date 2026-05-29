@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.video.alldebrid"
-       version="1.0.7"
+       version="1.1.0"
        name="AllDebrid Cloud"
        provider-name="vignesh.nayagam">
     <requires>
@@ -11,7 +11,7 @@
     </extension>
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Browse and stream your AllDebrid cloud content</summary>
-        <description lang="en_GB">Access your AllDebrid magnet downloads and saved links directly in Kodi. Supports PIN authentication for easy setup on Android TV, folder browsing, and multi-quality streaming.</description>
+        <description lang="en_GB">Access your AllDebrid magnet downloads and saved links directly in Kodi. Supports PIN authentication for easy setup on Android TV, folder browsing, multi-quality streaming, playback resume, and Kodi library integration with TMDB metadata (posters, plots, ratings).</description>
         <platform>all</platform>
         <license>GPL-3.0-only</license>
         <assets>

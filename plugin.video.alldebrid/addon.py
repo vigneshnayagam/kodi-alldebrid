@@ -9,6 +9,7 @@ import xbmcaddon
 from resources.lib.alldebrid import AllDebridAPI, AllDebridError
 from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play, play_direct
+from resources.lib.library import LibrarySync
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
     read_debug_trace, clear_debug_trace, get_bool_setting, debug_trace,
@@ -62,6 +63,8 @@ def main_menu():
          _folder_item('My Magnets', 'DefaultFolder.png'), True),
         (build_url(action='saved_links'),
          _folder_item('Saved Links', 'DefaultFolder.png'), True),
+        (build_url(action='sync_all'),
+         _folder_item('Sync All to Library', 'DefaultAddSource.png'), False),
         (build_url(action='add_magnet'),
          _folder_item('Add Magnet', 'DefaultAddSource.png'), False),
         (build_url(action='reauth'),
@@ -117,6 +120,11 @@ def list_magnets():
             ('Delete Magnet',
              f'RunPlugin({build_url(action="delete_magnet", id=magnet_id)})'),
         ]
+        if status_code == 4:
+            context_items.append(
+                ('Sync to Library',
+                 f'RunPlugin({build_url(action="sync_magnet", id=magnet_id)})'),
+            )
         if status_code >= 5:
             context_items.append(
                 ('Restart Magnet',
@@ -268,6 +276,7 @@ def delete_magnet(magnet_id):
         return
     try:
         api.delete_magnet(magnet_id)
+        LibrarySync(api).remove_synced_magnet(magnet_id)
         notify('Magnet deleted')
         xbmc.executebuiltin('Container.Refresh')
     except AllDebridError as e:
@@ -398,6 +407,14 @@ def router():
         delete_magnet(int(params['id']))
     elif action == 'restart_magnet':
         restart_magnet(int(params['id']))
+    elif action == 'sync_magnet':
+        api = get_api()
+        if api:
+            LibrarySync(api).sync_magnet(int(params['id']))
+    elif action == 'sync_all':
+        api = get_api()
+        if api:
+            LibrarySync(api).sync_all()
     elif action == 'add_magnet':
         add_magnet_dialog()
     elif action == 'reauth':

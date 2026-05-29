@@ -35,6 +35,32 @@
                     <default>true</default>
                     <control type="toggle"/>
                 </setting>
+                <setting id="enable_resume" type="boolean" label="Resume playback where you left off">
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+        </category>
+        <category id="library" label="Library">
+            <group id="library_paths">
+                <setting id="library_movies_path" type="string" label="Movies library path">
+                    <default>special://profile/strm/Movies</default>
+                    <control type="edit" format="string"/>
+                </setting>
+                <setting id="library_tvshows_path" type="string" label="TV Shows library path">
+                    <default>special://profile/strm/TVShows</default>
+                    <control type="edit" format="string"/>
+                </setting>
+                <setting id="auto_sync" type="boolean" label="Auto-sync new magnets to library">
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+            <group id="tmdb">
+                <setting id="tmdb_api_key" type="string" label="TMDB API Key (leave empty for default)">
+                    <default></default>
+                    <control type="edit" format="string"/>
+                </setting>
             </group>
         </category>
         <category id="advanced" label="Advanced">
