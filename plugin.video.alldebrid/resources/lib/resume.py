@@ -38,20 +38,51 @@ def _key(link):
     return hashlib.md5(link.encode('utf-8')).hexdigest()
 
 
+_DEFAULTS = {
+    'position': 0.0,
+    'total': 0.0,
+    'filename': '',
+    'audio_idx': None,
+    'audio_name': '',
+    'sub_idx': None,
+    'sub_name': '',
+    'subs_showing': False,
+}
+
+
 def get_resume_position(link):
+    """Return a dict of saved playback state, or defaults if nothing is saved."""
     db = _load_db()
     entry = db.get(_key(link))
     if not entry:
-        return 0.0, 0.0
-    return float(entry.get('position', 0)), float(entry.get('total', 0))
+        return dict(_DEFAULTS)
+    result = dict(_DEFAULTS)
+    result.update({
+        'position': float(entry.get('position', 0)),
+        'total': float(entry.get('total', 0)),
+        'filename': entry.get('filename', ''),
+        'audio_idx': entry.get('audio_idx'),
+        'audio_name': entry.get('audio_name', ''),
+        'sub_idx': entry.get('sub_idx'),
+        'sub_name': entry.get('sub_name', ''),
+        'subs_showing': bool(entry.get('subs_showing', False)),
+    })
+    return result
 
 
-def save_resume_position(link, position, total, filename=''):
+def save_resume_position(link, position, total, filename='',
+                         audio_idx=None, audio_name='',
+                         sub_idx=None, sub_name='', subs_showing=False):
     db = _load_db()
     db[_key(link)] = {
         'position': position,
         'total': total,
         'filename': filename,
+        'audio_idx': audio_idx,
+        'audio_name': audio_name,
+        'sub_idx': sub_idx,
+        'sub_name': sub_name,
+        'subs_showing': subs_showing,
         'updated': int(time.time()),
     }
     cutoff = int(time.time()) - 90 * 86400
