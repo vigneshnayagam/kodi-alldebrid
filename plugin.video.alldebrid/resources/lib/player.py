@@ -9,6 +9,7 @@ import xbmcvfs
 from .alldebrid import AllDebridError
 from .utils import notify, debug_trace, get_int_setting, get_bool_setting
 from .resume import get_resume_position
+from .metadata import TMDBClient, fetch_browse_info, apply_video_info
 
 HANDLE = int(sys.argv[1])
 
@@ -82,8 +83,14 @@ def _make_listitem(play_url, filename, resume_position=0, resume_total=0):
     li = xbmcgui.ListItem(label=filename, path=play_url)
     li.setProperty('IsPlayable', 'true')
     li.setContentLookup(False)
-    info = li.getVideoInfoTag()
-    info.setTitle(filename)
+    li.getVideoInfoTag().setTitle(filename)
+
+    try:
+        info = fetch_browse_info(TMDBClient(), filename)
+        apply_video_info(li, info)
+    except Exception as e:
+        debug_trace(f'player metadata enrichment skipped: {e}')
+
     if resume_position > 0 and resume_total > 0:
         li.setProperty('ResumeTime', str(resume_position))
         li.setProperty('TotalTime', str(resume_total))

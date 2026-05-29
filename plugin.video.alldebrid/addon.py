@@ -10,7 +10,9 @@ from resources.lib.alldebrid import AllDebridAPI, AllDebridError
 from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play, play_direct
 from resources.lib.library import LibrarySync
-from resources.lib.metadata import TMDBClient, fetch_browse_info, parse_filename, TMDBAuthError
+from resources.lib.metadata import (
+    TMDBClient, fetch_browse_info, parse_filename, apply_video_info, TMDBAuthError,
+)
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
     read_debug_trace, clear_debug_trace, get_bool_setting, debug_trace,
@@ -385,31 +387,8 @@ def _build_file_listing(entries, magnet_id, path_prefix=''):
                 label += f'  ({size_text})'
             li = xbmcgui.ListItem(label=label)
             li.setProperty('IsPlayable', 'true')
-
-            tag = li.getVideoInfoTag()
-            tag.setTitle(info['title'])
-            if info['plot']:
-                tag.setPlot(info['plot'])
-            if info['year']:
-                tag.setYear(info['year'])
-            if info['rating']:
-                tag.setRating(float(info['rating']))
-            if info['genres']:
-                tag.setGenres(info['genres'])
-            if info['media_type'] == 'tvshow':
-                if info['season'] is not None:
-                    tag.setSeason(info['season'])
-                if info['episode'] is not None:
-                    tag.setEpisode(info['episode'])
-
-            art = {'icon': 'DefaultVideo.png'}
-            if info['poster']:
-                art['poster'] = info['poster']
-            if info['fanart']:
-                art['fanart'] = info['fanart']
-            if info['thumb']:
-                art['thumb'] = info['thumb']
-            li.setArt(art)
+            li.setArt({'icon': 'DefaultVideo.png'})
+            apply_video_info(li, info)
 
             url = build_url(action='play', link=quote_plus(link))
             items.append((url, li, False))

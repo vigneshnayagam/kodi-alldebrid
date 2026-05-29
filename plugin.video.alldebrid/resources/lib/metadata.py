@@ -232,6 +232,35 @@ def fetch_browse_info(tmdb, filename):
     return info
 
 
+def apply_video_info(listitem, info):
+    """Apply a fetch_browse_info() dict to a ListItem's video tag and art."""
+    tag = listitem.getVideoInfoTag()
+    tag.setTitle(info['title'])
+    if info.get('plot'):
+        tag.setPlot(info['plot'])
+    if info.get('year'):
+        tag.setYear(info['year'])
+    if info.get('rating'):
+        tag.setRating(float(info['rating']))
+    if info.get('genres'):
+        tag.setGenres(info['genres'])
+    if info.get('media_type') == 'tvshow':
+        if info.get('season') is not None:
+            tag.setSeason(info['season'])
+        if info.get('episode') is not None:
+            tag.setEpisode(info['episode'])
+
+    art = {}
+    if info.get('poster'):
+        art['poster'] = info['poster']
+    if info.get('fanart'):
+        art['fanart'] = info['fanart']
+    if info.get('thumb'):
+        art['thumb'] = info['thumb']
+    if art:
+        listitem.setArt(art)
+
+
 def _cache_path():
     addon = xbmcaddon.Addon()
     profile = xbmcvfs.translatePath(addon.getAddonInfo('profile'))
