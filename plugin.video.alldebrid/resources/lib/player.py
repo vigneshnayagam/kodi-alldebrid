@@ -4,135 +4,27 @@ import traceback
 import xbmc
 import xbmcgui
 import xbmcplugin
+import xbmcaddon
+import xbmcvfs
 from .alldebrid import AllDebridError
 from .utils import notify, debug_trace, get_int_setting, get_bool_setting
-from .resume import get_resume_position, save_resume_position, clear_resume_position
+from .resume import get_resume_position
 
 HANDLE = int(sys.argv[1])
 
-_active_player = None
 
-
-class AllDebridPlayer(xbmc.Player):
-
-    def __init__(self, link, filename, resume=None):
-        super().__init__()
-        self._link = link
-        self._filename = filename
-        self._resume = resume  # dict from get_resume_position, or None
-        self._tracking = True
-
-    def onAVStarted(self):
-        """Fires once audio/video streams are actually loaded — safe to set tracks here."""
-        if not self._resume:
-            return
-        try:
-            self._restore_audio()
-            self._restore_subtitles()
-        except RuntimeError:
-            pass
-
-    def onPlayBackStopped(self):
-        self._save_position()
-        self._tracking = False
-
-    def onPlayBackPaused(self):
-        self._save_position()
-
-    def onPlayBackEnded(self):
-        clear_resume_position(self._link)
-        self._tracking = False
-
-    def _restore_audio(self):
-        saved_idx = self._resume.get('audio_idx')
-        saved_name = self._resume.get('audio_name', '')
-        if saved_idx is None and not saved_name:
-            return
-
-        streams = self.getAvailableAudioStreams()
-        if not streams:
-            return
-
-        # Prefer name match (robust across re-encodes / fresh URLs)
-        if saved_name:
-            for i, name in enumerate(streams):
-                if saved_name.lower() in str(name).lower():
-                    debug_trace(f'restore audio: name match "{name}" at index {i}')
-                    self.setAudioStream(i)
-                    return
-
-        # Fall back to stored index
-        if saved_idx is not None and 0 <= saved_idx < len(streams):
-            debug_trace(f'restore audio: index fallback {saved_idx}')
-            self.setAudioStream(saved_idx)
-
-    def _restore_subtitles(self):
-        saved_idx = self._resume.get('sub_idx')
-        saved_name = self._resume.get('sub_name', '')
-        subs_showing = self._resume.get('subs_showing', False)
-
-        if saved_idx is not None or saved_name:
-            streams = self.getAvailableSubtitleStreams()
-            if streams:
-                matched = False
-                if saved_name:
-                    for i, name in enumerate(streams):
-                        if saved_name.lower() in str(name).lower():
-                            debug_trace(f'restore subtitle: name match "{name}" at index {i}')
-                            self.setSubtitles(i)
-                            matched = True
-                            break
-                if not matched and saved_idx is not None and 0 <= saved_idx < len(streams):
-                    debug_trace(f'restore subtitle: index fallback {saved_idx}')
-                    self.setSubtitles(saved_idx)
-
-        self.showSubtitles(subs_showing)
-        debug_trace(f'restore subtitles: showing={subs_showing}')
-
-    def _save_position(self):
-        if not self._tracking:
-            return
-        try:
-            pos = self.getTime()
-            total = self.getTotalTime()
-            if total > 0 and pos > 0:
-                if pos / total > 0.90:
-                    clear_resume_position(self._link)
-                    return
-
-                audio_idx = None
-                audio_name = ''
-                sub_idx = None
-                sub_name = ''
-                subs_showing = False
-
-                try:
-                    audio_idx = self.getAudioStream()
-                    audio_streams = self.getAvailableAudioStreams()
-                    if audio_streams and 0 <= audio_idx < len(audio_streams):
-                        audio_name = str(audio_streams[audio_idx])
-                except Exception:
-                    pass
-
-                try:
-                    sub_idx = self.getSubtitleStream()
-                    sub_streams = self.getAvailableSubtitleStreams()
-                    if sub_streams and 0 <= sub_idx < len(sub_streams):
-                        sub_name = str(sub_streams[sub_idx])
-                    subs_showing = self.isSubtitlesShowing()
-                except Exception:
-                    pass
-
-                debug_trace(
-                    f'save resume: pos={pos:.1f} audio={audio_idx}("{audio_name}") '
-                    f'sub={sub_idx}("{sub_name}") subs_showing={subs_showing}'
-                )
-                save_resume_position(
-                    self._link, pos, total, self._filename,
-                    audio_idx, audio_name, sub_idx, sub_name, subs_showing,
-                )
-        except RuntimeError:
-            pass
+def _write_current_play(link, filename):
+    """Tell the background service what's currently playing."""
+    try:
+        addon = xbmcaddon.Addon()
+        profile = xbmcvfs.translatePath(addon.getAddonInfo('profile'))
+        xbmcvfs.mkdirs(profile)
+        path = profile + 'current_play.json'
+        f = xbmcvfs.File(path, 'w')
+        f.write(json.dumps({'link': link, 'filename': filename}))
+        f.close()
+    except Exception as e:
+        debug_trace(f'_write_current_play failed: {e}')
 
 
 def _resolve_url(api, link):
@@ -199,7 +91,6 @@ def _make_listitem(play_url, filename, resume_position=0, resume_total=0):
 
 def resolve_and_play(api, link):
     """Used when Kodi is in resolve mode (clicking a playable file item)."""
-    global _active_player
     debug_trace('=== PLAY (resolve mode) ===')
     debug_trace(f'input link: {link}')
     try:
@@ -208,17 +99,18 @@ def resolve_and_play(api, link):
             xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
             return
 
-        resume = None
+        position, total = 0.0, 0.0
         if get_bool_setting('enable_resume', True):
             resume = get_resume_position(link)
-            debug_trace(f'resume: pos={resume["position"]:.1f} audio={resume["audio_idx"]} sub={resume["sub_idx"]}')
+            position = resume['position']
+            total = resume['total']
+            debug_trace(f'resume lookup: pos={position:.1f} audio={resume["audio_idx"]} sub={resume["sub_idx"]}')
 
-        position = resume['position'] if resume else 0.0
-        total = resume['total'] if resume else 0.0
+        # Write before setResolvedUrl so service has it when onAVStarted fires
+        _write_current_play(link, filename)
         li = _make_listitem(play_url, filename, position, total)
         debug_trace('calling setResolvedUrl(True)')
         xbmcplugin.setResolvedUrl(HANDLE, True, li)
-        _active_player = AllDebridPlayer(link, filename, resume)
     except Exception as e:
         debug_trace(f'UNEXPECTED EXCEPTION: {e}')
         debug_trace(traceback.format_exc())
@@ -231,7 +123,6 @@ def play_direct(api, link):
     Used when NOT in resolve mode (e.g. auto-play after entering a magnet folder).
     Starts playback directly via the Player, which works in any context.
     """
-    global _active_player
     debug_trace('=== PLAY (direct/Player mode) ===')
     debug_trace(f'input link: {link}')
     try:
@@ -240,17 +131,18 @@ def play_direct(api, link):
         if not play_url:
             return
 
-        resume = None
+        position, total = 0.0, 0.0
         if get_bool_setting('enable_resume', True):
             resume = get_resume_position(link)
-            debug_trace(f'resume: pos={resume["position"]:.1f} audio={resume["audio_idx"]} sub={resume["sub_idx"]}')
+            position = resume['position']
+            total = resume['total']
+            debug_trace(f'resume lookup: pos={position:.1f} audio={resume["audio_idx"]} sub={resume["sub_idx"]}')
 
-        position = resume['position'] if resume else 0.0
-        total = resume['total'] if resume else 0.0
+        # Write before play() so service has it when onAVStarted fires
+        _write_current_play(link, filename)
         li = _make_listitem(play_url, filename, position, total)
-        debug_trace('calling AllDebridPlayer.play()')
-        _active_player = AllDebridPlayer(link, filename, resume)
-        _active_player.play(play_url, li)
+        debug_trace('calling xbmc.Player().play()')
+        xbmc.Player().play(play_url, li)
     except Exception as e:
         debug_trace(f'UNEXPECTED EXCEPTION: {e}')
         debug_trace(traceback.format_exc())
