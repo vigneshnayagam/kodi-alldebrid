@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Generates the Kodi repository artifacts:
-  - Zips each addon under repo/<addon-id>/<addon-id>-<version>.zip
-  - Generates repo/addons.xml + addons.xml.md5
-  - Generates Apache-style index.html in each repo subdirectory
-    so Kodi can browse the GitHub Pages site as a directory listing
+Generates the Kodi repository artifacts.
 
-Run from the kodi_agent/ directory:
+Stable build (updates addons.xml, used by Kodi auto-updates):
     python3 generate_repo.py
+
+Dev build (drops zip into repo/plugin.video.alldebrid/dev/, no addons.xml change):
+    python3 generate_repo.py --dev
 """
 
+import argparse
 import hashlib
 import os
 import zipfile
@@ -33,10 +33,9 @@ def get_addon_info(addon_dir):
     return root.get('id'), root.get('version'), root
 
 
-def zip_addon(addon_dir, addon_id, version):
-    zip_dir = os.path.join(REPO_DIR, addon_id)
-    os.makedirs(zip_dir, exist_ok=True)
-    zip_path = os.path.join(zip_dir, f'{addon_id}-{version}.zip')
+def zip_addon(addon_dir, addon_id, version, out_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    zip_path = os.path.join(out_dir, f'{addon_id}-{version}.zip')
 
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         for dirpath, dirnames, filenames in os.walk(addon_dir):
@@ -106,8 +105,19 @@ def write_index(directory, title):
     print(f'  index.html: {path}')
 
 
-def main():
-    print('Generating Kodi repository...\n')
+def refresh_indexes():
+    write_index(REPO_DIR, 'repo')
+    for name in os.listdir(REPO_DIR):
+        subdir = os.path.join(REPO_DIR, name)
+        if os.path.isdir(subdir):
+            write_index(subdir, f'repo/{name}')
+            dev_dir = os.path.join(subdir, 'dev')
+            if os.path.isdir(dev_dir):
+                write_index(dev_dir, f'repo/{name}/dev')
+
+
+def build_stable():
+    print('Generating stable Kodi repository...\n')
 
     addon_roots = []
     for addon_dir in ADDON_SOURCES:
@@ -115,13 +125,13 @@ def main():
             print(f'WARNING: skipping missing dir: {addon_dir}')
             continue
         addon_id, version, root = get_addon_info(addon_dir)
+        out_dir = os.path.join(REPO_DIR, addon_id)
         print(f'Processing {addon_id} v{version}')
-        zip_addon(addon_dir, addon_id, version)
+        zip_addon(addon_dir, addon_id, version, out_dir)
         addon_roots.append(root)
 
     print()
 
-    # addons.xml + md5
     addons_xml = generate_addons_xml(addon_roots)
     with open(os.path.join(REPO_DIR, 'addons.xml'), 'w', encoding='utf-8') as f:
         f.write(addons_xml)
@@ -130,29 +140,60 @@ def main():
         f.write(md5)
     print(f'Generated addons.xml (md5: {md5})')
 
-    # index.html files for Kodi directory browsing
     print('\nGenerating index.html files...')
-    write_index(REPO_DIR, 'repo')
-    for name in os.listdir(REPO_DIR):
-        subdir = os.path.join(REPO_DIR, name)
-        if os.path.isdir(subdir):
-            write_index(subdir, f'repo/{name}')
+    refresh_indexes()
 
     print(f'''
-Done! Push to GitHub and enable GitHub Pages:
+Done! Commit and push:
 
-  git add repo/ && git commit -m "Update repo" && git push
-  gh api repos/vigneshnayagam/kodi-alldebrid/pages \\
-    --method POST -f source[branch]=main -f source[path]=/
+  git add repo/ && git commit -m "v{addon_roots[0].get("version") if addon_roots else "?"}: stable release" && git push
 
-Then in Kodi:
-  Settings → File Manager → Add source
-  URL: {PAGES_BASE}/repo/
-  Name: AllDebrid Repo
-
-  Add-ons → Install from zip file → AllDebrid Repo
-    → repository.alldebrid/ → repository.alldebrid-1.0.0.zip
+Kodi repo URL: {PAGES_BASE}/repo/
 ''')
+
+
+def build_dev():
+    print('Generating dev build...\n')
+
+    addon_dir = os.path.join(SCRIPT_DIR, 'plugin.video.alldebrid')
+    if not os.path.isdir(addon_dir):
+        print(f'ERROR: {addon_dir} not found')
+        return
+
+    addon_id, version, _ = get_addon_info(addon_dir)
+    out_dir = os.path.join(REPO_DIR, addon_id, 'dev')
+    print(f'Processing {addon_id} v{version} → dev/')
+    zip_addon(addon_dir, addon_id, version, out_dir)
+
+    print('\nGenerating index.html files...')
+    refresh_indexes()
+
+    dev_url = f'{PAGES_BASE}/repo/{addon_id}/dev/'
+    print(f'''
+Done! Commit and push:
+
+  git add repo/{addon_id}/dev/ repo/{addon_id}/index.html repo/index.html
+  git commit -m "Dev build: {addon_id} v{version}"
+  git push
+
+To install in Kodi:
+  Add-ons → Install from zip file → AllDebrid Repo
+    → {addon_id}/ → dev/ → {addon_id}-{version}.zip
+
+Or browse directly: {dev_url}
+''')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate Kodi repository artifacts')
+    parser.add_argument('--dev', action='store_true',
+                        help='Build dev zip into repo/<addon>/dev/ without touching addons.xml')
+    args = parser.parse_args()
+
+    if args.dev:
+        build_dev()
+    else:
+        build_stable()
 
 
 if __name__ == '__main__':
