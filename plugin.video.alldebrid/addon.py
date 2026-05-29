@@ -10,6 +10,7 @@ from resources.lib.alldebrid import AllDebridAPI, AllDebridError
 from resources.lib.auth import ensure_auth, clear_auth
 from resources.lib.player import resolve_and_play, play_direct
 from resources.lib.library import LibrarySync
+from resources.lib.metadata import TMDBClient, fetch_browse_info, parse_filename, TMDBAuthError
 from resources.lib.utils import (
     format_size, format_status, format_date, is_video_file, log, notify,
     read_debug_trace, clear_debug_trace, get_bool_setting, debug_trace,
@@ -333,44 +334,100 @@ def _folder_item(label, icon):
 def _build_file_listing(entries, magnet_id, path_prefix=''):
     items = []
     skipped = 0
+    has_folder = False
+    media_types = set()
+    tmdb = TMDBClient()
+    warned = False
+
     for entry in entries:
         name = entry.get('n', 'Unknown')
         children = entry.get('e')
         link = entry.get('l')
 
         if children is not None:
+            has_folder = True
             li = xbmcgui.ListItem(label=name)
             li.setArt({'icon': 'DefaultFolder.png'})
             sub_path = f'{path_prefix}/{name}' if path_prefix else name
             url = build_url(action='folder', id=magnet_id, path=quote_plus(sub_path))
             items.append((url, li, True))
 
-        elif link:
+        elif link and is_video_file(name):
             size_text = format_size(entry.get('s', 0))
-            label = name
+
+            info = None
+            try:
+                info = fetch_browse_info(tmdb, name)
+            except TMDBAuthError:
+                if not warned:
+                    notify('TMDB API key invalid - set your own in Settings > Library',
+                           icon='error')
+                    warned = True
+            except Exception as e:
+                debug_trace(f'browse metadata failed for "{name}": {e}')
+
+            if info is None:
+                parsed = parse_filename(name)
+                info = {
+                    'title': parsed['title'] or name,
+                    'year': parsed['year'],
+                    'media_type': parsed['media_type'],
+                    'season': parsed['season'],
+                    'episode': parsed['episode'],
+                    'plot': '', 'rating': None, 'genres': [],
+                    'poster': '', 'fanart': '', 'thumb': '',
+                }
+
+            media_types.add(info['media_type'])
+
+            label = info['title']
             if size_text:
                 label += f'  ({size_text})'
-
             li = xbmcgui.ListItem(label=label)
             li.setProperty('IsPlayable', 'true')
 
-            if is_video_file(name):
-                li.setArt({'icon': 'DefaultVideo.png'})
-                info_tag = li.getVideoInfoTag()
-                info_tag.setTitle(name)
-            else:
-                li.setArt({'icon': 'DefaultFile.png'})
+            tag = li.getVideoInfoTag()
+            tag.setTitle(info['title'])
+            if info['plot']:
+                tag.setPlot(info['plot'])
+            if info['year']:
+                tag.setYear(info['year'])
+            if info['rating']:
+                tag.setRating(float(info['rating']))
+            if info['genres']:
+                tag.setGenres(info['genres'])
+            if info['media_type'] == 'tvshow':
+                if info['season'] is not None:
+                    tag.setSeason(info['season'])
+                if info['episode'] is not None:
+                    tag.setEpisode(info['episode'])
+
+            art = {'icon': 'DefaultVideo.png'}
+            if info['poster']:
+                art['poster'] = info['poster']
+            if info['fanart']:
+                art['fanart'] = info['fanart']
+            if info['thumb']:
+                art['thumb'] = info['thumb']
+            li.setArt(art)
 
             url = build_url(action='play', link=quote_plus(link))
             items.append((url, li, False))
         else:
             skipped += 1
-            debug_trace(f'SKIPPED entry (no e/l): {json.dumps(entry)[:300]}')
+            debug_trace(f'SKIPPED entry (no e / non-video): {json.dumps(entry)[:300]}')
 
     debug_trace(f'_build_file_listing: {len(items)} items, {skipped} skipped, prefix="{path_prefix}"')
 
+    if not has_folder and media_types == {'tvshow'}:
+        content = 'episodes'
+    elif not has_folder and media_types == {'movie'}:
+        content = 'movies'
+    else:
+        content = 'videos'
+
     xbmcplugin.addDirectoryItems(HANDLE, items, len(items))
-    xbmcplugin.setContent(HANDLE, 'videos')
+    xbmcplugin.setContent(HANDLE, content)
     xbmcplugin.endOfDirectory(HANDLE)
 
 

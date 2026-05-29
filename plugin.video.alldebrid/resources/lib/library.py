@@ -8,7 +8,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcvfs
 
-from .metadata import parse_filename, TMDBClient
+from .metadata import parse_filename, TMDBClient, TMDBAuthError
 from .utils import is_video_file, debug_trace, notify
 
 PLUGIN_ID = 'plugin.video.alldebrid'
@@ -34,6 +34,12 @@ class LibrarySync:
             self._tvshows_path = xbmcvfs.translatePath(self._tvshows_path)
         self._tmdb = TMDBClient()
         self._manifest = self._load_manifest()
+        self._tmdb_warned = False
+
+    def _warn_tmdb_auth(self):
+        if not self._tmdb_warned:
+            notify('TMDB API key invalid - set your own in Settings > Library', icon='error')
+            self._tmdb_warned = True
 
     def sync_magnet(self, magnet_id):
         debug_trace(f'=== SYNC magnet {magnet_id} ===')
@@ -142,6 +148,8 @@ class LibrarySync:
         tmdb_data = None
         try:
             tmdb_data = self._tmdb.search_movie(title, year)
+        except TMDBAuthError:
+            self._warn_tmdb_auth()
         except Exception as e:
             debug_trace(f'TMDB search failed for "{title}": {e}')
 
@@ -181,6 +189,8 @@ class LibrarySync:
         tmdb_data = None
         try:
             tmdb_data = self._tmdb.search_tv(title, year)
+        except TMDBAuthError:
+            self._warn_tmdb_auth()
         except Exception as e:
             debug_trace(f'TMDB TV search failed for "{title}": {e}')
 

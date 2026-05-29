@@ -3,10 +3,15 @@ import json
 import time
 import urllib.request
 import urllib.parse
+import urllib.error
 import xbmcaddon
 import xbmcvfs
 from .constants import TMDB_API_BASE, TMDB_IMAGE_BASE, DEFAULT_TMDB_API_KEY
 from .utils import debug_trace
+
+
+class TMDBAuthError(Exception):
+    """Raised when TMDB rejects the API key (invalid / not granted)."""
 
 
 NOISE_PATTERN = re.compile(
@@ -93,8 +98,13 @@ class TMDBClient:
         url = f'{TMDB_API_BASE}{path}?{urllib.parse.urlencode(params)}'
         debug_trace(f'TMDB request: {path}')
         req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-        resp = urllib.request.urlopen(req, timeout=10)
-        return json.loads(resp.read().decode('utf-8'))
+        try:
+            resp = urllib.request.urlopen(req, timeout=10)
+            return json.loads(resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                raise TMDBAuthError('Invalid TMDB API key')
+            raise
 
     def _cached(self, cache_key, fetcher):
         entry = self._cache.get(cache_key)
@@ -156,6 +166,70 @@ class TMDBClient:
         if not path:
             return ''
         return f'{TMDB_IMAGE_BASE}/{size}{path}'
+
+
+def fetch_browse_info(tmdb, filename):
+    """Resolve display metadata for a video filename.
+
+    Always returns at least the cleaned title so the browse view shows clean
+    names even when TMDB is unavailable. Raises TMDBAuthError if the key is
+    rejected, so callers can warn the user once.
+    """
+    parsed = parse_filename(filename)
+    info = {
+        'title': parsed['title'] or filename,
+        'year': parsed['year'],
+        'media_type': parsed['media_type'],
+        'season': parsed['season'],
+        'episode': parsed['episode'],
+        'plot': '',
+        'rating': None,
+        'genres': [],
+        'poster': '',
+        'fanart': '',
+        'thumb': '',
+    }
+
+    if not parsed['title']:
+        return info
+
+    if parsed['media_type'] == 'tvshow':
+        search = tmdb.search_tv(parsed['title'], parsed['year'])
+        if search:
+            info['title'] = search.get('name', info['title'])
+            info['plot'] = search.get('overview', '')
+            info['rating'] = search.get('vote_average')
+            info['poster'] = tmdb.get_image_url(search.get('poster_path'))
+            info['fanart'] = tmdb.get_image_url(search.get('backdrop_path'), 'w1280')
+            details = tmdb.get_tv_details(search['id'])
+            if details:
+                info['genres'] = [g.get('name', '') for g in details.get('genres', [])]
+            ep = tmdb.get_episode_details(search['id'], parsed['season'], parsed['episode'])
+            if ep:
+                info['title'] = ep.get('name') or info['title']
+                if ep.get('overview'):
+                    info['plot'] = ep['overview']
+                still = ep.get('still_path')
+                if still:
+                    info['thumb'] = tmdb.get_image_url(still)
+    else:
+        search = tmdb.search_movie(parsed['title'], parsed['year'])
+        if search:
+            info['title'] = search.get('title', info['title'])
+            info['plot'] = search.get('overview', '')
+            info['rating'] = search.get('vote_average')
+            info['poster'] = tmdb.get_image_url(search.get('poster_path'))
+            info['fanart'] = tmdb.get_image_url(search.get('backdrop_path'), 'w1280')
+            release = search.get('release_date', '')
+            if release and not info['year']:
+                info['year'] = int(release[:4])
+            details = tmdb.get_movie_details(search['id'])
+            if details:
+                info['genres'] = [g.get('name', '') for g in details.get('genres', [])]
+
+    if info['poster'] and not info['thumb']:
+        info['thumb'] = info['poster']
+    return info
 
 
 def _cache_path():

@@ -1,71 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <settings version="2">
     <section id="main">
-        <category id="account" label="Account">
+        <category id="account" label="30000">
             <group id="auth">
-                <setting id="api_key" type="string" label="API Key">
+                <setting id="api_key" type="string" label="30001">
                     <default></default>
                     <control type="edit" format="string" hidden="true"/>
                 </setting>
-                <setting id="username" type="string" label="Logged in as" enable="false">
+                <setting id="username" type="string" label="30002" enable="false">
                     <default></default>
                     <control type="edit" format="string"/>
                 </setting>
-                <setting id="premium_until" type="string" label="Premium until" enable="false">
+                <setting id="premium_until" type="string" label="30003" enable="false">
                     <default></default>
                     <control type="edit" format="string"/>
                 </setting>
             </group>
         </category>
-        <category id="playback" label="Playback">
+        <category id="playback" label="30010">
             <group id="quality">
-                <setting id="preferred_quality" type="integer" label="Preferred Video Quality">
+                <setting id="preferred_quality" type="integer" label="30011">
                     <default>0</default>
                     <constraints>
                         <options>
-                            <option label="Original (Direct Link)">0</option>
-                            <option label="1080p">1080</option>
-                            <option label="720p">720</option>
-                            <option label="480p">480</option>
+                            <option label="30012">0</option>
+                            <option label="30013">1080</option>
+                            <option label="30014">720</option>
+                            <option label="30015">480</option>
                         </options>
                     </constraints>
                     <control type="spinner"/>
                 </setting>
-                <setting id="auto_play_single" type="boolean" label="Auto-play single file magnets">
+                <setting id="auto_play_single" type="boolean" label="30016">
                     <default>true</default>
                     <control type="toggle"/>
                 </setting>
-                <setting id="enable_resume" type="boolean" label="Resume playback where you left off">
+                <setting id="enable_resume" type="boolean" label="30017">
                     <default>true</default>
                     <control type="toggle"/>
                 </setting>
             </group>
         </category>
-        <category id="library" label="Library">
+        <category id="library" label="30020">
             <group id="library_paths">
-                <setting id="library_movies_path" type="string" label="Movies library path">
+                <setting id="library_movies_path" type="string" label="30021">
                     <default>special://profile/strm/Movies</default>
                     <control type="edit" format="string"/>
                 </setting>
-                <setting id="library_tvshows_path" type="string" label="TV Shows library path">
+                <setting id="library_tvshows_path" type="string" label="30022">
                     <default>special://profile/strm/TVShows</default>
                     <control type="edit" format="string"/>
                 </setting>
-                <setting id="auto_sync" type="boolean" label="Auto-sync new magnets to library">
+                <setting id="auto_sync" type="boolean" label="30023">
                     <default>false</default>
                     <control type="toggle"/>
                 </setting>
             </group>
             <group id="tmdb">
-                <setting id="tmdb_api_key" type="string" label="TMDB API Key (leave empty for default)">
+                <setting id="tmdb_api_key" type="string" label="30024" help="30025">
                     <default></default>
                     <control type="edit" format="string"/>
                 </setting>
             </group>
         </category>
-        <category id="advanced" label="Advanced">
+        <category id="advanced" label="30030">
             <group id="debug">
-                <setting id="debug_logging" type="boolean" label="Enable debug logging">
+                <setting id="debug_logging" type="boolean" label="30031">
                     <default>false</default>
                     <control type="toggle"/>
                 </setting>

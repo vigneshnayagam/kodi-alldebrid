@@ -27,4 +27,4 @@ VIDEO_EXTENSIONS = (
 
 TMDB_API_BASE = 'https://api.themoviedb.org/3'
 TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
-DEFAULT_TMDB_API_KEY = 'b370b60fbe498f60c0e69075ca8847ad'
+DEFAULT_TMDB_API_KEY = ''
