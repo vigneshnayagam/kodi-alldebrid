@@ -55,7 +55,8 @@ def _resolve_url(api, link):
         return None, None
 
     play_url = direct_url
-    preferred_quality = get_int_setting('preferred_quality', 0)
+    _quality_map = {0: 0, 1: 1080, 2: 720, 3: 480}
+    preferred_quality = _quality_map.get(get_int_setting('preferred_quality', 0), 0)
 
     if preferred_quality > 0 and streams and gen_id:
         stream_id = select_stream(streams, preferred_quality)

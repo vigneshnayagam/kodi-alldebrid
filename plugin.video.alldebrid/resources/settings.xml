@@ -1,75 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<settings version="2">
-    <section id="main">
-        <category id="account" label="30000">
-            <group id="auth">
-                <setting id="api_key" type="string" label="30001">
-                    <default></default>
-                    <control type="edit" format="string" hidden="true"/>
-                </setting>
-                <setting id="username" type="string" label="30002" enable="false">
-                    <default></default>
-                    <control type="edit" format="string"/>
-                </setting>
-                <setting id="premium_until" type="string" label="30003" enable="false">
-                    <default></default>
-                    <control type="edit" format="string"/>
-                </setting>
-            </group>
-        </category>
-        <category id="playback" label="30010">
-            <group id="quality">
-                <setting id="preferred_quality" type="integer" label="30011">
-                    <default>0</default>
-                    <constraints>
-                        <options>
-                            <option label="30012">0</option>
-                            <option label="30013">1080</option>
-                            <option label="30014">720</option>
-                            <option label="30015">480</option>
-                        </options>
-                    </constraints>
-                    <control type="spinner"/>
-                </setting>
-                <setting id="auto_play_single" type="boolean" label="30016">
-                    <default>true</default>
-                    <control type="toggle"/>
-                </setting>
-                <setting id="enable_resume" type="boolean" label="30017">
-                    <default>true</default>
-                    <control type="toggle"/>
-                </setting>
-            </group>
-        </category>
-        <category id="library" label="30020">
-            <group id="library_paths">
-                <setting id="library_movies_path" type="string" label="30021">
-                    <default>special://profile/strm/Movies</default>
-                    <control type="edit" format="string"/>
-                </setting>
-                <setting id="library_tvshows_path" type="string" label="30022">
-                    <default>special://profile/strm/TVShows</default>
-                    <control type="edit" format="string"/>
-                </setting>
-                <setting id="auto_sync" type="boolean" label="30023">
-                    <default>false</default>
-                    <control type="toggle"/>
-                </setting>
-            </group>
-            <group id="tmdb">
-                <setting id="tmdb_api_key" type="string" label="30024" help="30025">
-                    <default></default>
-                    <control type="edit" format="string"/>
-                </setting>
-            </group>
-        </category>
-        <category id="advanced" label="30030">
-            <group id="debug">
-                <setting id="debug_logging" type="boolean" label="30031">
-                    <default>false</default>
-                    <control type="toggle"/>
-                </setting>
-            </group>
-        </category>
-    </section>
+<settings>
+    <category label="Account">
+        <setting id="api_key" type="text" label="API Key" default="" option="hidden"/>
+        <setting id="username" type="text" label="Logged in as" default="" enable="false"/>
+        <setting id="premium_until" type="text" label="Premium until" default="" enable="false"/>
+    </category>
+    <category label="Playback">
+        <setting id="preferred_quality" type="labelenum" label="Preferred Video Quality"
+                 lvalues="Original (Direct Link)|1080p|720p|480p" default="0"/>
+        <setting id="auto_play_single" type="bool" label="Auto-play single file magnets" default="true"/>
+        <setting id="enable_resume" type="bool" label="Resume playback where you left off" default="true"/>
+    </category>
+    <category label="Library">
+        <setting id="library_movies_path" type="text" label="Movies library path"
+                 default="special://profile/strm/Movies"/>
+        <setting id="library_tvshows_path" type="text" label="TV Shows library path"
+                 default="special://profile/strm/TVShows"/>
+        <setting id="auto_sync" type="bool" label="Auto-sync new magnets to library" default="false"/>
+        <setting id="tmdb_api_key" type="text"
+                 label="TMDB API Key  (get a free key at themoviedb.org/settings/api)"
+                 default=""/>
+    </category>
+    <category label="Advanced">
+        <setting id="debug_logging" type="bool" label="Enable debug logging" default="false"/>
+    </category>
 </settings>
